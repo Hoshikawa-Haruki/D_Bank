@@ -78,69 +78,74 @@ void main()
 	
         }		
     }
- 	
+    }
     clrscr();
     EXEC SQL COMMIT WORK RELEASE ;
-        }
-        
+    
 }
 
-void login(){
-    
+void login() {
     EXEC SQL BEGIN DECLARE SECTION;
-   char v_id[100];
-   char v_pwd[100];
-   varchar db_id[100];
-   varchar db_pwd[100];
+    char v_id[100] ;
+    char v_pwd[100] ;
+    varchar db_id[100] ;
+    varchar db_pwd[100] ;
 
-   char sqlstmt[1000];
+    char sqlstmt[1000] = {0};
     EXEC SQL END DECLARE SECTION;
 
+    // 사용자 입력
+    clrscr();
+    print_screen("user_login.txt");
 
-   /* 사용자 입력 */
-   clrscr();
+    printf("아이디를 입력하세요: ");
+    fgets(v_id, sizeof(v_id), stdin);
+    v_id[strcspn(v_id, "\n")] = '\0'; // 개행 문자 제거
 
-   print_screen("user_login.txt");
-    gotoxy(40,6);
-    gets(v_id);
+    printf("비밀번호를 입력하세요: ");
+    fgets(v_pwd, sizeof(v_pwd), stdin);
+    v_pwd[strcspn(v_pwd, "\n")] = '\0'; // 개행 문자 제거
 
-    gotoxy(40, 8);
-    gets(v_pwd);
-   /* 실행시킬 SQL 문장*/
-   sprintf(sqlstmt,"SELECT user_id, user_password FROM B_USER where user_id = '%s' and user_password = '%s'", v_id, v_pwd); 
+    // SQL 문 준비
+    sprintf(sqlstmt, "SELECT user_id, user_password FROM B_USER WHERE user_id = '%s' AND user_password = '%s'", v_id, v_pwd);
+    printf("SQL Statement: %s\n", sqlstmt);
 
-   /* select 문장이 제대로 구성되어 있는지 화면에 찍어봄 */
-   printf("sqlstmt:%s\n", sqlstmt);
+    EXEC SQL PREPARE S FROM :sqlstmt;
+    EXEC SQL DECLARE l_cursor CURSOR FOR S;
+    EXEC SQL OPEN l_cursor;
 
-   EXEC SQL PREPARE S FROM :sqlstmt ;
+    isLogin = 0; // 초기화
 
-   /* 1. cursor declare */
-   EXEC SQL DECLARE l_cursor CURSOR FOR S ; 
-
-   /* 2. cursor open */
-   EXEC SQL OPEN l_cursor ; 
-
-
-   // EXEC SQL WHENEVER NOT FOUND DO break ;  원래는 이렇게 해야 하는데 버그 때문에 아래와 같이 사용함
- 
-        /* 3. tuple fetch */
+    while (1) {
+        // 데이터 가져오기
         EXEC SQL FETCH l_cursor INTO :db_id, :db_pwd;
-       
-    if(sqlca.sqlcode == 1403) {  // 더이상 가져올 투플이 없는 경우
-         break;
-    }
-    else{
-        db_id.arr[db_id.len] = '\0';  // NULL 종료
-        db_pwd.arr[db_pwd.len] = '\0'; // NULL 종료
-        strcpy(id, db_id.arr);
-        strcpy(password, db_pwd.arr);
-        isLogin = 1;
-    }
-   
-    /* 4. close the cursor. */
-    EXEC SQL CLOSE l_cursor;
-}
 
+        if (sqlca.sqlcode == 1403) {  // 데이터 없음
+            printf("로그인 실패: 아이디 또는 비밀번호가 잘못되었습니다.\n");
+            break;
+        } else if (sqlca.sqlcode < 0) {  // SQL 오류
+            printf("SQL 오류 발생: %s\n", sqlca.sqlerrm.sqlerrmc);
+            break;
+        }
+
+        // 데이터 처리
+        db_id.arr[db_id.len] = '\0';
+        db_pwd.arr[db_pwd.len] = '\0';
+        strncpy(id, db_id.arr, sizeof(id) - 1);
+        strncpy(password, db_pwd.arr, sizeof(password) - 1);
+        isLogin = 1;
+        printf("로그인 성공! 사용자: %s\n", id);
+        break;
+    }
+
+    // 커서 닫기
+    EXEC SQL CLOSE l_cursor;
+
+    // 로그인 실패 시
+    if (isLogin == 0) {
+        printf("로그인을 다시 시도하세요.\n");
+    }
+}
 
 void db_connect()
 {
