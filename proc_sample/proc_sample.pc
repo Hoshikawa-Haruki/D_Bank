@@ -30,7 +30,8 @@ void db_connect();
 void select_tuple();
 void insert_tuple();
 void delete_tuple();
-void update_tuple();
+void update_deposit_tuple();
+void transaction_tuple();
 void sql_error();
 void login();
 char id[50];
@@ -42,7 +43,6 @@ void main()
     char c = 0;
 
 
-
     _putenv("NLS_LANG=American_America.KO16KSC5601");  //한글사용시 필요함
 
    /* Register sql_error() as the error handler. */
@@ -50,7 +50,7 @@ void main()
 
     db_connect();
 
-    while( c != '5') {  
+    while( c != '0') {  
         // 메인 화면 출력
         if(isLogin==0){
             login();
@@ -59,7 +59,7 @@ void main()
             clrscr();
 
         print_screen("user_main.txt") ;
-        gotoxy(49,15);
+        gotoxy(49,19);
 
         
         c = getchar() ;
@@ -72,16 +72,20 @@ void main()
                          break;
             case '3' : delete_tuple();
                          break;
-            case '4' : update_tuple();
+            case '4' : 
+                         break;
+            case '5' : update_deposit_tuple();
+                         break;
+            case '6' :   break;
+            case '7' : transaction_tuple();
                          break;
             default : break ;
 	
-        }		
-    }
+            }		
+        }
     }
     clrscr();
     EXEC SQL COMMIT WORK RELEASE ;
-    
 }
 
 void login() {
@@ -97,18 +101,15 @@ void login() {
     // 사용자 입력
     clrscr();
     print_screen("user_login.txt");
-
-    printf("아이디를 입력하세요: ");
+    gotoxy(40, 5);
     fgets(v_id, sizeof(v_id), stdin);
     v_id[strcspn(v_id, "\n")] = '\0'; // 개행 문자 제거
-
-    printf("비밀번호를 입력하세요: ");
+    gotoxy(40, 7);
     fgets(v_pwd, sizeof(v_pwd), stdin);
     v_pwd[strcspn(v_pwd, "\n")] = '\0'; // 개행 문자 제거
 
     // SQL 문 준비
     sprintf(sqlstmt, "SELECT user_id, user_password FROM B_USER WHERE user_id = '%s' AND user_password = '%s'", v_id, v_pwd);
-    printf("SQL Statement: %s\n", sqlstmt);
 
     EXEC SQL PREPARE S FROM :sqlstmt;
     EXEC SQL DECLARE l_cursor CURSOR FOR S;
@@ -121,7 +122,9 @@ void login() {
         EXEC SQL FETCH l_cursor INTO :db_id, :db_pwd;
 
         if (sqlca.sqlcode == 1403) {  // 데이터 없음
+            gotoxy(25, 10);
             printf("로그인 실패: 아이디 또는 비밀번호가 잘못되었습니다.\n");
+            getch();
             break;
         } else if (sqlca.sqlcode < 0) {  // SQL 오류
             printf("SQL 오류 발생: %s\n", sqlca.sqlerrm.sqlerrmc);
@@ -134,17 +137,14 @@ void login() {
         strncpy(id, db_id.arr, sizeof(id) - 1);
         strncpy(password, db_pwd.arr, sizeof(password) - 1);
         isLogin = 1;
+        gotoxy(25, 10);
         printf("로그인 성공! 사용자: %s\n", id);
+        getch();
         break;
     }
 
     // 커서 닫기
     EXEC SQL CLOSE l_cursor;
-
-    // 로그인 실패 시
-    if (isLogin == 0) {
-        printf("로그인을 다시 시도하세요.\n");
-    }
 }
 
 void db_connect()
@@ -165,7 +165,7 @@ void db_connect()
     EXEC SQL CONNECT :uid IDENTIFIED BY :pwd;
 
     // connection이 실패했을경우의 처리부분
-    if ( Error_flag ==1 ){
+    if ( Error_flag == 1 ){
         //printf("Connect error: %s", sqlca.sqlerrm.sqlerrmc);
         exit(-1);
     }
@@ -201,7 +201,7 @@ EXEC SQL END DECLARE SECTION;
    sprintf(sqlstmt,"SELECT acc_date, acc_number, acc_balance FROM account where acc_user = '%s'", id); 
 
    /* select 문장이 제대로 구성되어 있는지 화면에 찍어봄 */
-   printf("sqlstmt:%s\n", sqlstmt);
+   // printf("sqlstmt:%s\n", sqlstmt);
 
    EXEC SQL PREPARE S FROM :sqlstmt ;
 
@@ -243,7 +243,7 @@ EXEC SQL END DECLARE SECTION;
             y = 8 ;
         }
     }
-    printf("\n");	
+    printf("\n\n");	
     printf("                          match tuple no : %d\n", sqlca.sqlerrd[2]);
 
     /* 4. close the cursor. */
@@ -312,122 +312,111 @@ EXEC SQL END DECLARE SECTION;
     }
 }
 
-void update_tuple()
+void update_deposit_tuple()
 {
-EXEC SQL BEGIN DECLARE SECTION;
-    varchar v_empno[100];
-    varchar v_ename[100];
-    varchar v_job[16];
-
+    EXEC SQL BEGIN DECLARE SECTION;
+    varchar v_acc_number[100];
+    varchar v_acc_balance[100];
     char sqlstmt[1000];
-EXEC SQL END DECLARE SECTION;
+    EXEC SQL END DECLARE SECTION;
 
-    char findno[100] ;
-    char no[100] ;
-    char name[100];
-    char job[100];
+    char accNo[100];
+    char amount[100];
+    int deposit_amount = 0;
+    int x, y;
 
-    char  flag = 'n' ;
-    int x, y ;
-int i;
-//----------------------------------------
+    // 계좌 목록 출력
+    select_tuple();
 
-   clrscr();
-   print_screen("scr_update.txt");
+    clrscr();
+    print_screen("user_deposit_1.txt");
 
-    x = 40;
-    y = 6 ;
-
-    gotoxy(x,y)  ; 
-    gets(findno) ;
-
-/*------  수정할 투플을 먼저 찾아서 사용자에게 보여줌 ----------------*/
-
-    sprintf(sqlstmt,"SELECT empno, ename, job  FROM emp where empno = %s", findno) ;
-
-    //printf("stmt:%s\n", sqlstmt);
-
-    EXEC SQL PREPARE S FROM :sqlstmt ;
-
-    EXEC SQL DECLARE u_cursor CURSOR FOR S ; 
-
-    EXEC SQL OPEN u_cursor ; 
-
-    while(1)
-    {
-        EXEC SQL FETCH u_cursor INTO :v_empno, :v_ename, :v_job ;
-
-        if(sqlca.sqlcode == 1403) {  // 더이상 가져올 투플이 없는 경우
+    // 계좌번호 입력
+    x = 34;
+    y = 9;
+    gotoxy(x, y);
+    while (1) {
+        gets(accNo);
+        if (accNo[0] == '\0') {
+            printf("계좌번호를 입력하지 않았습니다. 다시 입력하세요: ");
+        } else {
             break;
         }
-
-        v_empno.arr[v_empno.len] = '\0';
-        v_ename.arr[v_ename.len] = '\0';
-        v_job.arr[v_job.len] = '\0';
-
-        printf("\n");
-        printf("                            사원번호:%s    사원이름:%s   직급:%s \n", v_empno.arr, v_ename.arr, v_job.arr );
     }
-    EXEC SQL CLOSE u_cursor; 
 
-    /*  가져온 투플이 하나도 없는 경우는 메시지 출력 후 돌아가야 함 */
-    if ( sqlca.sqlerrd[2] == 0 ) {
-        printf("검색된 투플이 없습니다!!!  아무키나 치세요");
+    // 계좌번호로 데이터 조회
+    sprintf(sqlstmt, "SELECT ACC_NUMBER, ACC_BALANCE FROM ACCOUNT WHERE ACC_NUMBER = '%s'", accNo);
+
+    EXEC SQL PREPARE S FROM :sqlstmt;
+    EXEC SQL DECLARE u_cursor CURSOR FOR S;
+    EXEC SQL OPEN u_cursor;
+    EXEC SQL FETCH u_cursor INTO :v_acc_number, :v_acc_balance;
+
+    if (sqlca.sqlcode == 1403) { // 계좌번호가 없는 경우
+        printf("검색된 계좌가 없습니다!!! 아무키나 치세요\n");
         getch();
-        return ;
+        EXEC SQL CLOSE u_cursor;
+        return;
     }
 
-    //---------- update 처리 --------------
- /* 수정 데이터 입력 */
-    x = 40;
-    y = 12 ;
+    v_acc_number.arr[v_acc_number.len] = '\0';
+    v_acc_balance.arr[v_acc_balance.len] = '\0';
 
-   /* 사원번호 입력 */
-    gotoxy(x,y)  ; 
-    gets(no);
-    if( no[0] == '\0' ){
-        strcpy(no, v_empno.arr);
-   }
-   /* 사원 이름 입력 */
-    y = y + 2 ;
-    gotoxy(x,y)  ;
-    gets(name);
-    if( name[0] == '\0' ){
-        strcpy(name, v_ename.arr);
-   }
-   /* 직급 입력 */
-    y = y + 2 ;
-    gotoxy(x,y) ;
-    gets(job);
-    if( job[0] == '\0' ){
-        strcpy(job, v_job.arr);
+    gotoxy(34, 15);
+    printf("\n");
+    printf("                            계좌번호: %s    현재 잔액: %s\n", v_acc_number.arr, v_acc_balance.arr);
+
+    EXEC SQL CLOSE u_cursor;
+
+    // 입금 금액 입력
+    y += 3;
+    gotoxy(x, y);
+    while (1) {
+        gets(amount);
+        if (amount[0] == '\0') {
+            printf("금액을 입력하지 않았습니다. 다시 입력하세요: ");
+        } else if (strspn(amount, "0123456789") != strlen(amount)) {
+            printf("금액은 숫자여야 합니다. 다시 입력하세요: ");
+        } else {
+            deposit_amount = atoi(amount);
+            if (deposit_amount <= 0) {
+                printf("입금 금액은 0보다 커야 합니다. 다시 입력하세요: ");
+            } else {
+                break;
+            }
+        }
     }
-    sprintf(sqlstmt,"update emp set empno = %s, ename= '%s', job = '%s' where empno = %s ", no, name, job, findno);
-    //printf("stmt:%s\n", sqlstmt);
-    
-     /* update문 실행 */
-    Error_flag = 0 ;
 
-   // 아래 문장 수행 중에 에러가 발생하면 error 처리 루틴으로 감. Error_flag=1로 바뀜 
-    EXEC SQL EXECUTE IMMEDIATE :sqlstmt ;
+    // 계좌 잔액 업데이트
+    sprintf(sqlstmt, "UPDATE ACCOUNT SET ACC_BALANCE = ACC_BALANCE + %d WHERE ACC_NUMBER = '%s'", deposit_amount, accNo);
 
-    if( Error_flag == 0 ) {  // 정상적으로 수행 되는 경우
-        printf("\n");	
-        printf(" 수정되었습니다. 아무키나 치세요 \n" ) ;
-        EXEC SQL COMMIT WORK ;
+    EXEC SQL EXECUTE IMMEDIATE :sqlstmt;
+
+    if (sqlca.sqlcode == 0) { // 성공 
+        EXEC SQL COMMIT WORK;
+        sprintf(sqlstmt,"INSERT INTO transaction (T_ID, T_SENDER, T_RECEIVER, T_AMOUNT) VALUES (t_id_seq.nextval, '00000000', '%s', %d)", accNo, deposit_amount);
+        EXEC SQL EXECUTE IMMEDIATE :sqlstmt;
+        clrscr();
+        print_screen("user_deposit_2.txt");
+        sprintf(sqlstmt, "SELECT ACC_BALANCE FROM ACCOUNT WHERE ACC_NUMBER = '%s'", accNo);
+
+        EXEC SQL PREPARE S2 FROM :sqlstmt; // 새 커서를 준비합니다.
+        EXEC SQL DECLARE balance_cursor CURSOR FOR S2;
+        EXEC SQL OPEN balance_cursor;
+
+        EXEC SQL FETCH balance_cursor INTO :v_acc_balance;
+        EXEC SQL CLOSE balance_cursor;
+        gotoxy(41, 9);
+        printf("%s", v_acc_balance.arr);
+        getch();
+    } else { // 실패
+        printf("\n입금되지 않았습니다. 아무키나 치세요\n");
+        EXEC SQL ROLLBACK WORK;
         getch();
     }
-    else {
-        printf("\n");	
-        printf(" 수정되지 않았습니다. 아무키나 치세요 \n" ) ;
-        EXEC SQL ROLLBACK WORK ;
-        getch();
-    }
-   //EXEC SQL EXECUTE IMMEDIATE :sqlstmt ;
-
-  // EXEC SQL COMMIT WORK ; 
-
+    EXEC SQL COMMIT WORK;
 }
+
 void delete_tuple()
 {
 
@@ -448,21 +437,25 @@ EXEC SQL END DECLARE SECTION;
     clrscr();
     print_screen("user_delete_1.txt");
 
-    x = 40;
-    y = 6 ;
-    gotoxy(x,y);
+    gotoxy(35,10);
     while(1) {
+        gotoxy(35,10);
+        printf("                  ");
+        gotoxy(35,10);
         gets(d_input); // 비밀번호 입력
     if(strcmp(d_input, password) == 0 ){
         clrscr();
         print_screen("user_delete_2.txt");
         break;
     } else {
+        gotoxy(20, 12);
         printf("비밀번호가 일치하지 않습니다. 다시 입력해 주세요.");
+        gotoxy(35,10);
     }
     }
     select_tuple();
 
+    gotoxy(10,17);
     printf("삭제할 계좌번호를 입력하세요 : ");
     while (1) {
     gets(accNo); // 계좌번호 입력
@@ -475,7 +468,6 @@ EXEC SQL END DECLARE SECTION;
     } else {
         break; // 유효한 입력값이 있으면 루프 종료
     }
-    gotoxy(x, y); // 입력 위치를 유지
 }
 
     
@@ -497,8 +489,8 @@ EXEC SQL END DECLARE SECTION;
 
         v_acc_number.arr[v_acc_number.len] = '\0';
         v_acc_balance.arr[v_acc_balance.len] = '\0';
-        printf("\n\n");
-        printf("                                계좌번호:%s    계좌잔액:%s \n", v_acc_number.arr, v_acc_balance.arr);
+        gotoxy(10,19);
+        printf("계좌번호 : %s    계좌잔액 : %s \n", v_acc_number.arr, v_acc_balance.arr);
     }
     EXEC SQL CLOSE d_cursor; 
 
@@ -510,6 +502,7 @@ EXEC SQL END DECLARE SECTION;
     }
 
     // 삭제 처리 부분
+    gotoxy(10,20);
     printf("위의 투플들을 삭제하시겠습니까? (y/n) :");   
 
     flag = (char *)getchar() ;
@@ -517,6 +510,7 @@ EXEC SQL END DECLARE SECTION;
 
     if( flag == 'y' || flag =='Y' ){
         if (strcmp(v_acc_balance.arr, "0") != 0) {
+        gotoxy(10,17);
         printf("계좌에 잔액이 존재해 계좌를 삭제할 수 없습니다!\n");
         getch();
         return;
@@ -529,8 +523,9 @@ EXEC SQL END DECLARE SECTION;
         EXEC SQL EXECUTE IMMEDIATE :sqlstmt ;
 
         if( Error_flag == 0 ) {  // 정상적으로 수행 되는 경우
-            printf("\n");	
-            printf(" 정상적으로 삭제되었습니다.  아무키나 치세요 \n" ) ;
+            printf("\n");
+            gotoxy(10,17);
+            printf("정상적으로 삭제되었습니다.  아무키나 치세요 \n" ) ;
             EXEC SQL COMMIT WORK ;
             getch();
         }
@@ -550,6 +545,89 @@ EXEC SQL END DECLARE SECTION;
     }
 
 }
+
+void transaction_tuple()
+{
+    select_tuple();
+
+    getch();
+   EXEC SQL BEGIN DECLARE SECTION;
+   varchar v_T_DATE[100];
+   varchar v_T_SENDER[100];
+   varchar v_T_RECEIVER[100];
+   varchar v_T_AMOUNT[100];
+
+    char sqlstmt[1000];
+    EXEC SQL END DECLARE SECTION;
+
+   char accNo[50] ; // 내 계좌번호 입력
+
+
+   int x, y, count=0, i ;
+
+   /* 사용자 입력 */
+   clrscr();
+
+   print_screen("user_transaction.txt");
+    gotoxy(27, 19);
+    gets(accNo);
+   /* 실행시킬 SQL 문장*/
+   sprintf(sqlstmt,"SELECT T_DATE, T_SENDER, T_RECEIVER, T_AMOUNT FROM TRANSACTION where T_SENDER = '%s' OR T_RECEIVER = '%s' ", accNo, accNo); 
+
+   /* select 문장이 제대로 구성되어 있는지 화면에 찍어봄 */
+   // printf("sqlstmt:%s\n", sqlstmt);
+
+   EXEC SQL PREPARE S FROM :sqlstmt ;
+
+   /* 1. cursor declare */
+   EXEC SQL DECLARE ts_cursor CURSOR FOR S ; 
+
+   /* 2. cursor open */
+   EXEC SQL OPEN ts_cursor ; 
+
+   x = 10;
+   y = 8 ;
+
+   // EXEC SQL WHENEVER NOT FOUND DO break ;  원래는 이렇게 해야 하는데 버그 때문에 아래와 같이 사용함
+   while(1)
+    {
+        /* 3. tuple fetch */
+        EXEC SQL FETCH ts_cursor INTO :v_T_DATE, :v_T_SENDER, :v_T_RECEIVER, :v_T_AMOUNT;
+       
+        if(sqlca.sqlcode == 1403) {  // 더이상 가져올 투플이 없는 경우
+            break;
+        }
+        v_T_DATE.arr[v_T_DATE.len] = '\0' ;
+        v_T_SENDER.arr[v_T_SENDER.len] = '\0';
+        v_T_RECEIVER.arr[v_T_RECEIVER.len] = '\0';
+        v_T_AMOUNT.arr[v_T_AMOUNT.len] = '\0';
+
+
+        gotoxy(x,y);
+        printf(" |  %10s  |   %-4s   |   %-10s  |   %13s 원|", v_T_DATE.arr ,v_T_SENDER.arr, v_T_RECEIVER.arr , v_T_AMOUNT.arr);
+        y++;
+        count++;
+        if( count == PAGE_NUM){
+            printf("\n\n                                  hit any key for next\n");
+            count = 0;
+            getch();
+
+            gotoxy(0,8); //이전 화면 부분 클리어
+            for(i= 0; i < PAGE_NUM; i++){
+                printf("                                                                                               \n");
+            }
+            y = 8 ;
+        }
+    }
+    printf("\n\n");	
+    printf("                          match tuple no : %d\n", sqlca.sqlerrd[2]);
+
+    /* 4. close the cursor. */
+    EXEC SQL CLOSE ts_cursor;
+
+    getch();   // 아무키나 치세요. 
+}
+
 //==================================================
 
 void print_screen(char fname[])
