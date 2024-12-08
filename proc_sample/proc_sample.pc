@@ -60,8 +60,7 @@ void main()
             clrscr();
 
         print_screen("user_main.txt") ;
-        printf("%s l %s", id, password);
-        gotoxy(49,15);
+        gotoxy(49,19);
 
         
         c = getchar() ;
@@ -102,17 +101,16 @@ void login() {
     clrscr();
     print_screen("user_login.txt");
 
-    printf("아이디를 입력하세요: ");
+    gotoxy(40,5);
     fgets(v_id, sizeof(v_id), stdin);
     v_id[strcspn(v_id, "\n")] = '\0'; // 개행 문자 제거
 
-    printf("비밀번호를 입력하세요: ");
+    gotoxy(40,7);
     fgets(v_pwd, sizeof(v_pwd), stdin);
     v_pwd[strcspn(v_pwd, "\n")] = '\0'; // 개행 문자 제거
 
     // SQL 문 준비
     sprintf(sqlstmt, "SELECT user_id, user_password FROM B_USER WHERE user_id = '%s' AND user_password = '%s'", v_id, v_pwd);
-    printf("SQL Statement: %s\n", sqlstmt);
 
     EXEC SQL PREPARE S FROM :sqlstmt;
     EXEC SQL DECLARE l_cursor CURSOR FOR S;
@@ -204,8 +202,6 @@ EXEC SQL END DECLARE SECTION;
    /* 실행시킬 SQL 문장*/
    sprintf(sqlstmt,"SELECT acc_date, acc_number, acc_balance FROM account where acc_user = '%s'", id); 
 
-   /* select 문장이 제대로 구성되어 있는지 화면에 찍어봄 */
-   printf("sqlstmt:%s\n", sqlstmt);
 
    EXEC SQL PREPARE S FROM :sqlstmt ;
 
@@ -417,7 +413,7 @@ EXEC SQL END DECLARE SECTION;
     printf("                             받는 분  : %s\n\n", v_receiver_name.arr);
 
     printf("                             출금 계좌: %s\n", sender);
-    printf("                             계좌 잔액: %11s\n\n\n", v_balance.arr);
+    printf("                             계좌 잔액: %8s 원\n\n\n", v_balance.arr);
 
     int sender_balance = atoi(v_balance.arr);
 
