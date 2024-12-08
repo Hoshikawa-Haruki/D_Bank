@@ -33,6 +33,7 @@ void delete_tuple();
 void send_money();
 void sql_error();
 void login();
+void withdraw();
 char id[50];
 char password[50];
 int isLogin = 0;
@@ -74,6 +75,8 @@ void main()
             case '3' : delete_tuple();
                          break;
             case '4' : send_money();
+                         break;
+            case '6' : withdraw();
                          break;
             default : break ;
 	
@@ -389,7 +392,7 @@ EXEC SQL END DECLARE SECTION;
 
     v_receiver_name.arr[v_receiver_name.len] = '\0';
 
-
+/*------  입금자 정보 조회 ----------------*/
     sprintf(sqlstmt_sender, "SELECT acc_balance FROM account WHERE acc_number = '%s'", sender);
     EXEC SQL PREPARE SENDER_QUERY FROM :sqlstmt_sender;
     EXEC SQL DECLARE sender_cursor CURSOR FOR SENDER_QUERY;
@@ -475,69 +478,88 @@ EXEC SQL END DECLARE SECTION;
     clrscr();
     print_screen("user_send_3.txt");
     getch();
+}
+
+void withdraw(){ // --------------------------------------------------------------출금
+    EXEC SQL BEGIN DECLARE SECTION;
+    varchar v_balance[16];
+
+    char sqlstmt[1000];
+    char update_stmt[1000];
+    char sqlstmt_transation[1000];
+    EXEC SQL END DECLARE SECTION;
+    char amount[100];
+    char account[100];
 
 
+    select_tuple();
 
+    clrscr();
+    print_screen("user_withdraw_1.txt");
+    gotoxy(34, 11);
+    gets(account);
 
+    sprintf(sqlstmt,"SELECT acc_balance FROM account where acc_user = '%s' and acc_number = '%s'", id, account);
+    //printf("stmt:%s\n", sqlstmt);
+    EXEC SQL PREPARE S FROM :sqlstmt ;
+    EXEC SQL DECLARE w_cursor CURSOR FOR S ; 
+    EXEC SQL OPEN w_cursor ; 
+    EXEC SQL FETCH w_cursor INTO :v_balance;
 
+    if(sqlca.sqlcode == 1403) {  // 더이상 가져올 투플이 없는 경우
+       printf("\n\n                     출금 계좌를 찾을 수 없습니다.\n");
+       EXEC SQL CLOSE w_cursor;
+       getch();
+       return;
+    }
+    v_balance.arr[v_balance.len] = '\0';
+    int current_balance = atoi(v_balance.arr);
 
+    clrscr();
+    print_screen("user_withdraw_2.txt");
+    gotoxy(34,9);
+    printf(account);
+    gotoxy(34, 11);
+    printf(v_balance.arr);
+    gotoxy(34, 14);
+    gets(amount);
+    int withdrawal_amount = atoi(amount);
 
+    if (withdrawal_amount > current_balance) {
+        printf("\n\n출금 금액이 잔액을 초과합니다. 출금할 수 없습니다.\n");
+        EXEC SQL CLOSE w_cursor;
+        getch();
+        return;
+    }
+    int new_balance = current_balance - withdrawal_amount;
+    sprintf(update_stmt, "UPDATE account SET acc_balance = %d WHERE acc_user = '%s' AND acc_number = '%s'",new_balance, id, account);
+    EXEC SQL EXECUTE IMMEDIATE :update_stmt;
+    if (sqlca.sqlcode == 0) {
 
+        sprintf(sqlstmt_transation,"INSERT INTO transaction (T_ID, T_SENDER, T_RECEIVER, T_AMOUNT) VALUES (t_id_seq.nextval, '%s', '00000000', %d)", account, withdrawal_amount);
+        EXEC SQL EXECUTE IMMEDIATE :sqlstmt_transation;
+        if (sqlca.sqlcode != 0)
+        {
+        printf("거래 내역 삽입 중 오류 발생: %d\n", sqlca.sqlcode);
+        EXEC SQL CLOSE w_cursor;
+        getch();
+        return;
+        }
 
-    
+        clrscr();
+        print_screen("user_withdraw_3.txt");
+        EXEC SQL COMMIT WORK;
+    } 
+    else{
+        printf("\n\n출금에 실패하였습니다. 다시 시도해주세요.\n");
+        EXEC SQL ROLLBACK WORK;
+    }
 
-
-//     //---------- update 처리 --------------
-//  /* 수정 데이터 입력 */
-//     x = 40;
-//     y = 12 ;
-
-//    /* 사원번호 입력 */
-//     gotoxy(x,y)  ; 
-//     gets(no);
-//     if( no[0] == '\0' ){
-//         strcpy(no, v_empno.arr);
-//    }
-//    /* 사원 이름 입력 */
-//     y = y + 2 ;
-//     gotoxy(x,y)  ;
-//     gets(name);
-//     if( name[0] == '\0' ){
-//         strcpy(name, v_ename.arr);
-//    }
-//    /* 직급 입력 */
-//     y = y + 2 ;
-//     gotoxy(x,y) ;
-//     gets(job);
-//     if( job[0] == '\0' ){
-//         strcpy(job, v_job.arr);
-//     }
-//     sprintf(sqlstmt,"update emp set empno = %s, ename= '%s', job = '%s' where empno = %s ", no, name, job, findno);
-//     //printf("stmt:%s\n", sqlstmt);
-    
-//      /* update문 실행 */
-//     Error_flag = 0 ;
-
-//    // 아래 문장 수행 중에 에러가 발생하면 error 처리 루틴으로 감. Error_flag=1로 바뀜 
-//     EXEC SQL EXECUTE IMMEDIATE :sqlstmt ;
-
-//     if( Error_flag == 0 ) {  // 정상적으로 수행 되는 경우
-//         printf("\n");	
-//         printf(" 수정되었습니다. 아무키나 치세요 \n" ) ;
-//         EXEC SQL COMMIT WORK ;
-//         getch();
-//     }
-//     else {
-//         printf("\n");	
-//         printf(" 수정되지 않았습니다. 아무키나 치세요 \n" ) ;
-//         EXEC SQL ROLLBACK WORK ;
-//         getch();
-//     }
-   //EXEC SQL EXECUTE IMMEDIATE :sqlstmt ;
-
-  // EXEC SQL COMMIT WORK ; 
+    EXEC SQL CLOSE w_cursor; // 커서 닫기
+    getch();
 
 }
+
 void delete_tuple()
 {
 
