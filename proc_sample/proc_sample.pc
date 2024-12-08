@@ -52,7 +52,7 @@ void main()
 
     db_connect();
 
-    while( c != '0') {  
+    while( c != '8') {  
         // 메인 화면 출력
         if(isLogin==0){
             login();
@@ -61,7 +61,7 @@ void main()
             clrscr();
 
         print_screen("user_main.txt") ;
-        gotoxy(49,19);
+        gotoxy(49,21);
 
         
         c = getchar() ;
@@ -80,7 +80,9 @@ void main()
                          break;
             case '6' : withdraw();
                         break;
-            case '7' : transaction_tuple();            
+            case '7' : transaction_tuple();  
+                        break;
+            case '8' : break;         
             default : break ;
 	
             }		
@@ -316,13 +318,15 @@ EXEC SQL END DECLARE SECTION;
 
     if( Error_flag == 0 ) {  // 정상적으로 수행 되는 경우
         printf("\n");	
-        printf(" 정상적으로 추가되었습니다.  아무키나 치세요 \n" ) ;
+        printf("                      정상적으로 추가되었습니다.  아무키나 치세요 \n" ) ;
+        printf("\n");
+        printf("                      계좌 번호 : %s", random_number ) ;
         EXEC SQL COMMIT WORK ;
         getch();
     }
     else {
         printf("\n");	
-        printf(" 튜플이 추가되지 않았습니다. 아무키나 치세요 \n" ) ;
+        printf("                      튜플이 추가되지 않았습니다. 아무키나 치세요 \n" ) ;
         EXEC SQL ROLLBACK WORK ;
         getch();
     }
