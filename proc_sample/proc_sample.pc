@@ -236,11 +236,11 @@ EXEC SQL END DECLARE SECTION;
             count = 0;
             getch();
 
-            gotoxy(0,10); //이전 화면 부분 클리어
+            gotoxy(0,8); //이전 화면 부분 클리어
             for(i= 0; i < PAGE_NUM; i++){
                 printf("                                                                                               \n");
             }
-            y = 10 ;
+            y = 8 ;
         }
     }
     printf("\n");	
@@ -432,51 +432,73 @@ void delete_tuple()
 {
 
 EXEC SQL BEGIN DECLARE SECTION;
-    varchar v_empno[100];
-    varchar v_ename[100];
+    varchar v_acc_number[100];
+    varchar v_acc_balance[100];
  
     char sqlstmt[1000];
 EXEC SQL END DECLARE SECTION;
 
-    char  no[100] ;
-    char  flag = 'n' ;
+    char accNo[50] ;
+    char d_input[50];
+    char flag = 'n' ;
     int x, y ;
-int i;
+    int i;
 //----------------------------------------
 
-   clrscr();
-   print_screen("scr_delete.txt");
+    clrscr();
+    print_screen("user_delete_1.txt");
 
     x = 40;
     y = 6 ;
+    gotoxy(x,y);
+    while(1) {
+        gets(d_input); // 비밀번호 입력
+    if(strcmp(d_input, password) == 0 ){
+        clrscr();
+        print_screen("user_delete_2.txt");
+        break;
+    } else {
+        printf("비밀번호가 일치하지 않습니다. 다시 입력해 주세요.");
+    }
+    }
+    select_tuple();
 
-    gotoxy(x,y)  ; 
-    gets(no) ;
+    printf("삭제할 계좌번호를 입력하세요 : ");
+    while (1) {
+    gets(accNo); // 계좌번호 입력
+
+    // 입력값 검증
+    if (accNo[0] == '\0') {
+        printf("계좌번호를 입력하지 않았습니다. 다시 입력하세요: ");
+    } else if (strspn(accNo, "0123456789") != strlen(accNo)) { // 숫자만 허용
+        printf("계좌번호는 숫자여야 합니다. 다시 입력하세요: ");
+    } else {
+        break; // 유효한 입력값이 있으면 루프 종료
+    }
+    gotoxy(x, y); // 입력 위치를 유지
+}
+
+    
 
 /*------ 삭제할 투플을 먼저 찾아서 사용자에게 보여줌 ----------------*/
-
-    sprintf(sqlstmt,"SELECT empno, ename  FROM emp where empno = %s", no) ;
-
+    sprintf(sqlstmt,"SELECT TO_CHAR(ACC_NUMBER), TO_CHAR(ACC_BALANCE) FROM ACCOUNT where TO_CHAR(ACC_NUMBER) = %s", accNo) ; // SQL문에 삽입
     //printf("stmt:%s\n", sqlstmt);
-
     EXEC SQL PREPARE S FROM :sqlstmt ;
-
     EXEC SQL DECLARE d_cursor CURSOR FOR S ; 
-
     EXEC SQL OPEN d_cursor ; 
 
     while(1)
     {
-        EXEC SQL FETCH d_cursor INTO :v_empno, :v_ename ;
+        EXEC SQL FETCH d_cursor INTO :v_acc_number, :v_acc_balance ;
 
         if(sqlca.sqlcode == 1403) {  // 더이상 가져올 투플이 없는 경우
             break;
         }
 
-        v_empno.arr[v_empno.len] = '\0';
-        v_ename.arr[v_ename.len] = '\0';
+        v_acc_number.arr[v_acc_number.len] = '\0';
+        v_acc_balance.arr[v_acc_balance.len] = '\0';
         printf("\n\n");
-        printf("                                사원번호:%s    사원이름:%s \n", v_empno.arr, v_ename.arr);
+        printf("                                계좌번호:%s    계좌잔액:%s \n", v_acc_number.arr, v_acc_balance.arr);
     }
     EXEC SQL CLOSE d_cursor; 
 
@@ -494,7 +516,13 @@ int i;
     while (getchar() != '\n');  // 첫글자 외 나머지 입력 버림
 
     if( flag == 'y' || flag =='Y' ){
-        sprintf(sqlstmt,"delete from emp where empno = %s ", no);
+        if (strcmp(v_acc_balance.arr, "0") != 0) {
+        printf("계좌에 잔액이 존재해 계좌를 삭제할 수 없습니다!\n");
+        getch();
+        return;
+        }
+
+        sprintf(sqlstmt,"delete from ACCOUNT where ACC_NUMBER = %s ", accNo);
         //printf("stmt:%s\n", sqlstmt);
         // 아래 문장 수행 중에 에러가 발생하면 error 처리 루틴으로 감. Error_flag=1로 바뀜 
         Error_flag = 0 ;
@@ -512,6 +540,7 @@ int i;
             EXEC SQL ROLLBACK WORK ;
             getch();
         }
+        
     }
     else {    // 삭제 취소
         printf("\n");	
@@ -599,5 +628,6 @@ void clrscr(void)
     FillConsoleOutputCharacter(STD_HANDLE, ' ', 120*28, Cur, &dwLen);
     gotoxy(0,0);
 }
+
 
 /*---------------------------------------------------------*/
