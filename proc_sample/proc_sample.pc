@@ -30,7 +30,7 @@ void db_connect();
 void select_tuple();
 void create_account();
 void delete_tuple();
-void update_tuple();
+void send_money();
 void sql_error();
 void login();
 char id[50];
@@ -73,7 +73,7 @@ void main()
                          break;
             case '3' : delete_tuple();
                          break;
-            case '4' : update_tuple();
+            case '4' : send_money();
                          break;
             default : break ;
 	
@@ -328,7 +328,7 @@ EXEC SQL END DECLARE SECTION;
     }
 }
 
-void update_tuple()
+void send_money()
 {
 EXEC SQL BEGIN DECLARE SECTION;
     varchar v_sender[100];
@@ -337,6 +337,9 @@ EXEC SQL BEGIN DECLARE SECTION;
 
     char sqlstmt[1000];
     char sqlstmt_sender[1000];
+    char sqlstmt_update_sender[1000];
+    char sqlstmt_update_receiver[1000];
+    char sqlstmt_transation[1000];
 EXEC SQL END DECLARE SECTION;
 
     char sender[100] ;
@@ -407,15 +410,17 @@ EXEC SQL END DECLARE SECTION;
     clrscr();
     print_screen("user_send_2.txt");
 
-    printf("\n\n                       입금 계좌: %s\n", receiver);
-    printf("                       받는 분  : %s\n\n", v_receiver_name.arr);
+    printf("\n\n                             입금 계좌: %s\n", receiver);
+    printf("                             받는 분  : %s\n\n", v_receiver_name.arr);
 
-    printf("                       출금 계좌: %s\n", sender);
-    printf("                       계좌 잔액: %11s\n\n\n", v_balance.arr);
+    printf("                             출금 계좌: %s\n", sender);
+    printf("                             계좌 잔액: %11s\n\n\n", v_balance.arr);
 
     int sender_balance = atoi(v_balance.arr);
 
-    printf("송금 금액: ");
+    printf("                             송금 금액: ");
+    printf("\n\n\n\n------------------------------------------------------------------------------");
+    gotoxy(40, 17);
     gets(amount);
     int transfer_amount = atoi(amount);
 
@@ -427,8 +432,53 @@ EXEC SQL END DECLARE SECTION;
         return;
     }
 
+
+    sprintf(sqlstmt_update_sender, "UPDATE account SET acc_balance = acc_balance - %d WHERE acc_number = '%s'", transfer_amount, sender);
+    EXEC SQL EXECUTE IMMEDIATE :sqlstmt_update_sender;
+    if (sqlca.sqlcode != 0)
+    {
+        printf("\n\n송금자 잔액 감소 중 오류가 발생했습니다.\n");
+        EXEC SQL CLOSE sender_cursor;
+        EXEC SQL CLOSE receiver_cursor;
+        getch();
+        return;
+    }
+    sprintf(sqlstmt_update_receiver, "UPDATE account SET acc_balance = acc_balance + %d WHERE acc_number = '%s'", transfer_amount, receiver);
+    EXEC SQL EXECUTE IMMEDIATE :sqlstmt_update_receiver;
+    if (sqlca.sqlcode != 0)
+    {
+        printf("\n\n수신자 잔액 증가 중 오류가 발생했습니다.\n");
+        EXEC SQL CLOSE sender_cursor;
+        EXEC SQL CLOSE receiver_cursor;
+        getch();
+        return;
+    }
+
+
+    sprintf(sqlstmt_transation,"INSERT INTO transaction (T_ID, T_SENDER, T_RECEIVER, T_AMOUNT) VALUES (t_id_seq.nextval, '%s', '%s', %d)", sender, receiver, transfer_amount);
+    EXEC SQL EXECUTE IMMEDIATE :sqlstmt_transation;
+    if (sqlca.sqlcode != 0)
+    {
+        printf("거래 내역 삽입 중 오류 발생: %d\n", sqlca.sqlcode);
+        EXEC SQL CLOSE sender_cursor;
+        EXEC SQL CLOSE receiver_cursor;
+        getch();
+        return;
+    }
+
+
+
+
+    EXEC SQL COMMIT;
     EXEC SQL CLOSE sender_cursor;
     EXEC SQL CLOSE receiver_cursor;
+    clrscr();
+    print_screen("user_send_3.txt");
+    getch();
+
+
+
+
 
 
 
